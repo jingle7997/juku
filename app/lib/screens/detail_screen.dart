@@ -8,20 +8,23 @@ import '../widgets/chrome.dart';
 import '../widgets/cover_card.dart';
 import 'player_screen.dart';
 
-Future<void> openDrama(BuildContext context, Drama drama) {
+Future<void> openDrama(BuildContext context, Drama drama, {Object? heroTag}) {
   return Navigator.of(context).push(
     PageRouteBuilder(
       transitionDuration: const Duration(milliseconds: 260),
-      pageBuilder: (_, __, ___) => DetailScreen(drama: drama),
+      pageBuilder: (_, __, ___) => DetailScreen(drama: drama, heroTag: heroTag),
       transitionsBuilder: (_, animation, __, child) => FadeTransition(opacity: animation, child: child),
     ),
   );
 }
 
 class DetailScreen extends StatefulWidget {
-  const DetailScreen({super.key, required this.drama});
+  const DetailScreen({super.key, required this.drama, this.heroTag});
 
   final Drama drama;
+
+  /// 与来源卡片的 Hero tag 对应；为 null 时不做飞入动画
+  final Object? heroTag;
 
   @override
   State<DetailScreen> createState() => _DetailScreenState();
@@ -66,10 +69,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 children: [
                   Container(color: palette.surfaceHigh),
                   if (cover.isNotEmpty)
-                    Hero(
-                      tag: 'cover-${drama.id}',
-                      child: Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox()),
-                    ),
+                    _coverImage(cover),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
@@ -187,6 +187,12 @@ class _DetailScreenState extends State<DetailScreen> {
         ],
       ),
     );
+  }
+
+  Widget _coverImage(String cover) {
+    final image = Image.network(cover, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox());
+    final tag = widget.heroTag;
+    return tag == null ? image : Hero(tag: tag, child: image);
   }
 
   void _play(BuildContext context, int episode) {

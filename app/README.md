@@ -10,9 +10,9 @@ App 与服务端唯一的耦合是下面「用到的服务端接口」那张表 
 
 ## 界面预览
 
-| 连接 | 首页 | 发现 / 榜单 | 我的剧集 | 详情 | 我的 |
-| --- | --- | --- | --- | --- | --- |
-| ![](preview/connect.png) | ![](preview/home.png) | ![](preview/discover.png) | ![](preview/following.png) | ![](preview/detail.png) | ![](preview/profile.png) |
+| 连接 | 首页 | 发现 / 榜单 | 追剧 | 观看记录 | 详情 | 我的 |
+| --- | --- | --- | --- | --- | --- | --- |
+| ![](preview/connect.png) | ![](preview/home.png) | ![](preview/discover.png) | ![](preview/following.png) | ![](preview/history.png) | ![](preview/detail.png) | ![](preview/profile.png) |
 
 换源面板（「我的 → 站源 → 切换站源」）：
 

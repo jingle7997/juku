@@ -234,6 +234,11 @@ class ApiClient {
     return PlaybackSource.fromJson((json as Map).cast<String, dynamic>());
   }
 
+  /// 上报观看进度。
+  ///
+  /// 服务端 handlePlaybackProgress 的结构是 `{session, progress:{...}}`，
+  /// 且解码时开了 DisallowUnknownFields —— 字段必须完全一致，平铺传会被判 400。
+  /// sequence 必须**每次上报都递增**，服务端用它丢弃乱序到达的旧进度。
   Future<void> reportProgress({
     required String session,
     required int run,
@@ -245,27 +250,41 @@ class ApiClient {
   }) async {
     await _send('/api/ui/playback/progress', method: 'POST', body: {
       'session': session,
-      'run': run,
-      'sequence': sequence,
-      'episode': episode,
-      'position': position,
-      'duration': duration,
-      'completed': completed,
+      'progress': {
+        'run': run,
+        'sequence': sequence,
+        'episode': episode,
+        'position': position,
+        'duration': duration,
+        'completed': completed,
+      },
     }, timeout: const Duration(seconds: 8));
   }
 
-  Future<void> closePlayback(String session, {int? episode, double? position, double? duration}) async {
+  /// 关闭播放会话，可顺带落一次进度。
+  ///
+  /// progress 里的 run / sequence 必须是真实的，服务端 recordPlaybackProgress
+  /// 对 run==0 或 sequence==0 直接判「观看进度无效」，只会白丢一次进度。
+  Future<void> closePlayback(
+    String session, {
+    int run = 0,
+    int sequence = 0,
+    int? episode,
+    double? position,
+    double? duration,
+    bool completed = false,
+  }) async {
     await _send('/api/ui/playback/control', method: 'POST', body: {
       'session': session,
       'action': 'close',
-      if (episode != null && position != null)
+      if (episode != null && position != null && run > 0 && sequence > 0)
         'progress': {
-          'run': 0,
-          'sequence': 0,
+          'run': run,
+          'sequence': sequence,
           'episode': episode,
           'position': position,
           'duration': duration ?? 0,
-          'completed': false,
+          'completed': completed,
         },
     }, timeout: const Duration(seconds: 8));
   }

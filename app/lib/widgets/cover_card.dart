@@ -21,6 +21,7 @@ class CoverCard extends StatelessWidget {
     this.showTitle = true,
     this.aspect = 3 / 4,
     this.badge,
+    this.heroTag,
   });
 
   final Drama drama;
@@ -29,10 +30,72 @@ class CoverCard extends StatelessWidget {
   final double aspect;
   final String? badge;
 
+  /// 跨页飞入动画的标识。同一个页面里同一部剧可能出现多次（比如首页的
+  /// 「为你推荐」和「全部短剧」），tag 必须按出现位置区分，否则 Flutter 会抛
+  /// 「There are multiple heroes that share the same tag」。为 null 则不做动画。
+  final Object? heroTag;
+
   @override
   Widget build(BuildContext context) {
     final palette = AppPalette.of(context);
     final url = resolveCover(context, drama.cover);
+    Widget cover = ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: AspectRatio(
+        aspectRatio: aspect,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: palette.surfaceHigh),
+            if (url.isNotEmpty)
+              Image.network(
+                url,
+                fit: BoxFit.cover,
+                cacheWidth: 480,
+                errorBuilder: (_, __, ___) => _placeholder(palette),
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(color: palette.surfaceHigh);
+                },
+              )
+            else
+              _placeholder(palette),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.center,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0x00000000), Color(0x99000000)],
+                ),
+              ),
+            ),
+            if (badge != null)
+              Positioned(
+                right: 6,
+                bottom: 6,
+                child: _Chip(text: badge!),
+              ),
+            if (drama.vip)
+              Positioned(
+                left: 6,
+                top: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE7B25C),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    'VIP',
+                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF3A2500)),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (heroTag != null) cover = Hero(tag: heroTag!, child: cover);
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -40,65 +103,7 @@ class CoverCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Hero(
-            tag: 'cover-${drama.id}',
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              child: AspectRatio(
-                aspectRatio: aspect,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    Container(color: palette.surfaceHigh),
-                    if (url.isNotEmpty)
-                      Image.network(
-                        url,
-                        fit: BoxFit.cover,
-                        cacheWidth: 480,
-                        errorBuilder: (_, __, ___) => _placeholder(palette),
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) return child;
-                          return Container(color: palette.surfaceHigh);
-                        },
-                      )
-                    else
-                      _placeholder(palette),
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.center,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0x00000000), Color(0x99000000)],
-                        ),
-                      ),
-                    ),
-                    if (badge != null)
-                      Positioned(
-                        right: 6,
-                        bottom: 6,
-                        child: _Chip(text: badge!),
-                      ),
-                    if (drama.vip)
-                      Positioned(
-                        left: 6,
-                        top: 6,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE7B25C),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'VIP',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF3A2500)),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+          cover,
           if (showTitle) ...[
             const SizedBox(height: 7),
             Text(

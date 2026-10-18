@@ -26,7 +26,11 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   PlaybackSession? _session;
   PlaybackSource? _source;
   int _episode = 1;
+  /// 上报序号，**每次上报都要递增**。服务端用 session.historySequence 丢弃
+  /// 乱序到达的旧进度，序号不变的话第二次之后的上报会被静默忽略。
   int _sequence = 0;
+  /// 切集请求令牌，用来丢弃被后续请求取代的旧结果
+  int _loadToken = 0;
   double _pendingStart = 0;
 
   bool _loading = true;
@@ -55,11 +59,25 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     WidgetsBinding.instance.removeObserver(this);
     _hideTimer?.cancel();
     _progressTimer?.cancel();
-    _reportProgress(force: true);
+    // 关会话时顺带落一次进度：run / sequence 必须是真的，
+    // 服务端对 run==0 或 sequence==0 会判为无效，等于白丢。
     final session = _session;
     final api = _state?.api;
+    final video = _video;
+    final source = _source;
     if (session != null && api != null) {
-      api.closePlayback(session.session).catchError((_) {});
+      final ready = video != null && video.value.isInitialized;
+      final position = ready ? video.value.position.inMilliseconds / 1000 : 0.0;
+      api
+          .closePlayback(
+            session.session,
+            run: source?.run ?? 0,
+            sequence: ++_sequence,
+            episode: ready && position > 0.5 ? _episode : null,
+            position: position,
+            duration: ready ? video.value.duration.inMilliseconds / 1000 : 0,
+          )
+          .catchError((_) {});
     }
     _video?.dispose();
     WakelockPlus.disable();
@@ -71,7 +89,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _reportProgress(force: true);
+      _reportProgress();
       _video?.pause();
     }
   }
@@ -115,6 +133,8 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final api = _state?.api ?? context.read<AppState>().api;
     final session = _session;
     if (api == null || session == null) return;
+    // 快速连点选集时，只认最后一次请求的结果
+    final token = ++_loadToken;
     setState(() {
       _switching = true;
       _error = null;
@@ -122,16 +142,16 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     });
     try {
       final source = await api.openStream(session: session.session, episode: index, start: start);
+      if (!mounted || token != _loadToken) return;
       final url = api.resolve(source.url);
       final previous = _video;
       final controller = VideoPlayerController.networkUrl(Uri.parse(url));
       await controller.initialize();
-      if (!mounted) {
+      if (!mounted || token != _loadToken) {
         await controller.dispose();
         return;
       }
       _source = source;
-      _sequence++;
       await previous?.dispose();
       setState(() {
         _video = controller;
@@ -148,14 +168,14 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       _startProgressTimer();
       _scheduleHide();
     } on ApiException catch (error) {
-      if (!mounted) return;
+      if (!mounted || token != _loadToken) return;
       setState(() {
         _loading = false;
         _switching = false;
         _error = error.message;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || token != _loadToken) return;
       setState(() {
         _loading = false;
         _switching = false;
@@ -168,7 +188,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     final video = _video;
     if (video == null || !video.value.isInitialized) return;
     if (video.value.isCompleted) {
-      _reportProgress(force: true, completed: true);
+      // 先摘掉监听：否则切集失败时这个已播完的 controller 会每帧继续触发，
+      // 变成不停地重新请求 openStream
+      video.removeListener(_onTick);
+      _reportProgress(completed: true);
       _nextEpisode();
       return;
     }
@@ -180,7 +203,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     _progressTimer = Timer.periodic(const Duration(seconds: 10), (_) => _reportProgress());
   }
 
-  Future<void> _reportProgress({bool force = false, bool completed = false}) async {
+  Future<void> _reportProgress({bool completed = false}) async {
     final api = _state?.api;
     final session = _session;
     final video = _video;
@@ -193,7 +216,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
       await api.reportProgress(
         session: session.session,
         run: source.run,
-        sequence: _sequence,
+        sequence: ++_sequence,
         episode: _episode,
         position: position,
         duration: video.value.duration.inMilliseconds / 1000,
@@ -207,13 +230,13 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
   void _nextEpisode() {
     final total = _session?.episodes.length ?? 0;
     if (_episode >= total) return;
-    _reportProgress(force: true);
+    _reportProgress();
     _loadEpisode(_episode + 1);
   }
 
   void _prevEpisode() {
     if (_episode <= 1) return;
-    _reportProgress(force: true);
+    _reportProgress();
     _loadEpisode(_episode - 1);
   }
 
@@ -428,7 +451,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                 onPressed: () {
                   if (video.value.isPlaying) {
                     video.pause();
-                    _reportProgress(force: true);
+                    _reportProgress();
                   } else {
                     video.play();
                   }
@@ -543,7 +566,7 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
                   return GestureDetector(
                     onTap: () {
                       Navigator.of(context).pop();
-                      _reportProgress(force: true);
+                      _reportProgress();
                       _loadEpisode(episode.index);
                     },
                     child: Container(

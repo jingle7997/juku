@@ -24,6 +24,8 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _loading = false;
   String? _error;
   String _keyword = '';
+  /// 搜索请求令牌，快速连续搜索时只认最后一次
+  int _searchToken = 0;
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _SearchScreenState extends State<SearchScreen> {
     if (keyword.isEmpty) return;
     final state = context.read<AppState>();
     final api = state.api;
+    final token = ++_searchToken;
     setState(() {
       _keyword = keyword;
       _error = null;
@@ -59,13 +62,13 @@ class _SearchScreenState extends State<SearchScreen> {
     if (api == null) return;
     try {
       final items = await api.search(keyword);
-      if (!mounted) return;
+      if (!mounted || token != _searchToken) return;
       setState(() => _results = items);
     } on ApiException catch (error) {
-      if (!mounted) return;
+      if (!mounted || token != _searchToken) return;
       setState(() => _error = error.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && token == _searchToken) setState(() => _loading = false);
     }
   }
 
@@ -104,6 +107,8 @@ class _SearchScreenState extends State<SearchScreen> {
                   focusNode: _focus,
                   textInputAction: TextInputAction.search,
                   onSubmitted: _submit,
+                  // 输入时重建，否则右侧的清除按钮不会出现（它读的是 _controller.text）
+                  onChanged: (_) => setState(() {}),
                   style: TextStyle(fontSize: 14, color: palette.text),
                   decoration: InputDecoration(
                     isDense: true,
@@ -117,10 +122,13 @@ class _SearchScreenState extends State<SearchScreen> {
                 GestureDetector(
                   onTap: () {
                     _controller.clear();
+                    // 让在途的搜索请求失效，避免清空后结果又跳回来
+                    _searchToken++;
                     setState(() {
                       _results = const [];
                       _local = const [];
                       _keyword = '';
+                      _loading = false;
                     });
                   },
                   child: Icon(Icons.close_rounded, size: 16, color: palette.textDim),
@@ -182,7 +190,8 @@ class _SearchScreenState extends State<SearchScreen> {
               return CoverCard(
                 drama: drama,
                 badge: drama.episodeCount > 0 ? '${drama.episodeCount}集' : null,
-                onTap: () => openDrama(context, drama),
+                heroTag: 'search-${drama.id}',
+                onTap: () => openDrama(context, drama, heroTag: 'search-${drama.id}'),
               );
             },
           ),

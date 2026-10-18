@@ -103,6 +103,7 @@ class AppState extends ChangeNotifier {
             .where((e) => e.id.isNotEmpty)
             .toList();
         _reindex();
+        _normalizeSource();
       }
     }
     final saved = prefs.serverUrl;
@@ -124,6 +125,8 @@ class AppState extends ChangeNotifier {
     api = client;
     serverUrl = normalized;
     lastError = null;
+    // 换了服务器，旧的剧集索引必须清掉，否则 dramaById 会返回上一台服务器的数据
+    _byId.clear();
     await prefs.pushRecentServer(normalized);
     prefs.serverUrl = normalized;
     notifyListeners();
@@ -159,27 +162,33 @@ class AppState extends ChangeNotifier {
     if (!silent) notifyListeners();
     try {
       final page = await client.library();
-      library = page.items;
-      _reindex();
+      // 服务端第一次抓源时 loading=true 且 data 为空，这时候不能拿空列表
+      // 覆盖已有数据，否则首页会闪空、还会把本地缓存写成空
+      final stillFetching = page.loading && page.items.isEmpty && library.isNotEmpty;
+      if (!stillFetching) {
+        library = page.items;
+        _reindex();
+        _normalizeSource();
+        await prefs.writeLibraryCache({
+          'data': library
+              .map((e) => {
+                    'id': e.id,
+                    'title': e.title,
+                    'cover': e.cover,
+                    'desc': e.desc,
+                    'source': e.source,
+                    'episodeCount': e.episodeCount,
+                    'category': e.category,
+                    'tags': e.tags,
+                    'score': e.score,
+                    'heat': e.heat,
+                    'releaseStatus': e.releaseStatus,
+                    'vip': e.vip,
+                  })
+              .toList(),
+        });
+      }
       lastError = null;
-      await prefs.writeLibraryCache({
-        'data': library
-            .map((e) => {
-                  'id': e.id,
-                  'title': e.title,
-                  'cover': e.cover,
-                  'desc': e.desc,
-                  'source': e.source,
-                  'episodeCount': e.episodeCount,
-                  'category': e.category,
-                  'tags': e.tags,
-                  'score': e.score,
-                  'heat': e.heat,
-                  'releaseStatus': e.releaseStatus,
-                  'vip': e.vip,
-                })
-            .toList(),
-      });
     } on ApiException catch (error) {
       lastError = error.message;
     } finally {
@@ -238,6 +247,9 @@ class AppState extends ChangeNotifier {
     final client = api;
     if (client == null) return;
     final saved = !isFollowing(drama.id);
+    // 保存整个列表快照：失败时原样恢复。
+    // 之前用 placeholder 回滚，会把该剧原有的观看进度（episode/position）冲成 0。
+    final previous = following;
     final placeholder = LibraryEntry(
       dramaId: drama.id,
       drama: drama,
@@ -246,6 +258,8 @@ class AppState extends ChangeNotifier {
       duration: 0,
       updatedAt: DateTime.now(),
       completed: false,
+      title: drama.title,
+      total: drama.episodeCount,
     );
     following = saved
         ? [placeholder, ...following.where((e) => e.dramaId != drama.id)]
@@ -254,10 +268,24 @@ class AppState extends ChangeNotifier {
     try {
       await client.setFollowing(drama.id, saved);
     } catch (_) {
-      // 回滚
-      following = saved
-          ? following.where((e) => e.dramaId != drama.id).toList()
-          : [placeholder, ...following];
+      following = previous;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// 取消追剧。直接按 id 操作，不依赖本地剧库里有这部剧 ——
+  /// 原来从 dramaById 取，取不到就静默什么都不做。
+  Future<void> unfollow(String dramaId) async {
+    final client = api;
+    if (client == null) return;
+    final previous = following;
+    following = following.where((e) => e.dramaId != dramaId).toList();
+    notifyListeners();
+    try {
+      await client.setFollowing(dramaId, false);
+    } catch (_) {
+      following = previous;
       notifyListeners();
       rethrow;
     }
@@ -285,6 +313,15 @@ class AppState extends ChangeNotifier {
       final drama = entry.drama;
       if (drama != null && drama.id.isNotEmpty) _byId[drama.id] = drama;
     }
+  }
+
+  /// 选中的站源在剧库里已经不存在时（换了服务器、或剧库刷新后这个源没了），
+  /// 自动退回「全部站源」。否则首页会一直空白，而换源面板里看不出原因。
+  void _normalizeSource() {
+    if (selectedSource.isEmpty || library.isEmpty) return;
+    if (availableSources.contains(selectedSource)) return;
+    selectedSource = '';
+    prefs.source = '';
   }
 
   @override

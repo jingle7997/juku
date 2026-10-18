@@ -50,7 +50,7 @@ class Drama {
       ])),
       desc: _str(json['desc'] ?? json['intro'] ?? json['remark']),
       source: _str(json['source']),
-      episodeCount: _int(_first(json, const [
+      episodeCount: _asInt(_first(json, const [
         'totalEpisode',
         'total_episode',
         'chapterCount',
@@ -85,13 +85,6 @@ class Drama {
     if (value is String) return value.trim();
     if (value is num) return value.toString();
     return '';
-  }
-
-  static int _int(Object? value) {
-    if (value is int) return value;
-    if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    return 0;
   }
 
   static Object? _first(Map<String, dynamic> json, List<String> keys) {
@@ -149,15 +142,30 @@ class LibraryEntry {
     required this.duration,
     required this.updatedAt,
     required this.completed,
+    this.title = '',
+    this.total = 0,
+    this.episodeLabel = '',
   });
 
   final String dramaId;
   final Drama? drama;
+
+  /// 看到 / 更新到第几集（数字）
   final int episode;
   final double position;
   final double duration;
   final DateTime? updatedAt;
   final bool completed;
+
+  /// 服务端给的剧名。本地剧库找不到这部剧时用它兜底，
+  /// 否则列表里只能显示 `hongguo:123` 这种原始 id。
+  final String title;
+
+  /// 总集数（history 的 total / following 的 knownEpisodes）
+  final int total;
+
+  /// 服务端给的分集文案，如「第 3 集」
+  final String episodeLabel;
 
   double get progress {
     if (duration <= 0) return 0;
@@ -167,10 +175,14 @@ class LibraryEntry {
   factory LibraryEntry.fromJson(Map<String, dynamic> json) {
     final raw = json['drama'] ?? json['detail'] ?? json['info'];
     final stamp = json['updatedAt'] ?? json['updateAt'] ?? json['time'] ?? json['watchedAt'];
+    // history 的 episode 是字符串（"第3集"），index 才是数字；
+    // following 没有 index，也没有分集文案。两种都要能读。
+    final rawEpisode = json['episode'];
+    final index = _asInt(json['index']);
     return LibraryEntry(
       dramaId: (json['dramaId'] ?? json['id'] ?? '').toString(),
       drama: raw is Map ? Drama.fromJson(raw.cast<String, dynamic>()) : null,
-      episode: (json['episode'] as num?)?.toInt() ?? (json['index'] as num?)?.toInt() ?? 0,
+      episode: index > 0 ? index : _asInt(rawEpisode),
       position: (json['position'] as num?)?.toDouble() ?? 0,
       duration: (json['duration'] as num?)?.toDouble() ?? 0,
       updatedAt: stamp is num
@@ -180,6 +192,9 @@ class LibraryEntry {
             )
           : DateTime.tryParse(stamp?.toString() ?? ''),
       completed: json['completed'] == true,
+      title: (json['title'] ?? '').toString().trim(),
+      total: _asInt(json['total'] ?? json['totalEpisode'] ?? json['knownEpisodes']),
+      episodeLabel: rawEpisode is String ? rawEpisode.trim() : '',
     );
   }
 }
@@ -301,8 +316,16 @@ class PlaybackQuality {
 
   factory PlaybackQuality.fromJson(Map<String, dynamic> json) {
     return PlaybackQuality(
-      value: (json['value'] ?? json['quality'] as num?)?.toInt() ?? 0,
+      value: _asInt(json['value'] ?? json['quality']),
       label: (json['label'] ?? json['name'] ?? '自动').toString(),
     );
   }
+}
+
+/// 宽松转 int：服务端同一含义的字段有时是数字、有时是「第3集」这种文案。
+int _asInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  return 0;
 }

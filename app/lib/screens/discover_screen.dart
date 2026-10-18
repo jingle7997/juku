@@ -31,6 +31,19 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadBoards());
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 站源在「我的」里切换后，这里要跟着换榜单。
+    // 放在 didChangeDependencies 而不是 build：build 会频繁触发，
+    // 每次都注册一个 post-frame 回调纯属浪费。
+    final source = context.watch<AppState>().selectedSource;
+    if (source == _lastSource) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncSource(source);
+    });
+  }
+
   /// 站源在「我的」里切换后，这里要跟着换榜单
   void _syncSource(String source) {
     if (source == _lastSource) return;
@@ -101,7 +114,6 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     final palette = AppPalette.of(context);
     final state = context.watch<AppState>();
     final boards = _visibleBoards(state.selectedSource);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncSource(state.selectedSource));
 
     return Scaffold(
       backgroundColor: palette.background,
@@ -254,7 +266,7 @@ class _RankRow extends StatelessWidget {
     final hot = rank <= 3;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => openDrama(context, drama),
+      onTap: () => openDrama(context, drama, heroTag: 'rank-${drama.id}'),
       child: Row(
         children: [
           SizedBox(
@@ -270,7 +282,16 @@ class _RankRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          SizedBox(width: 56, height: 76, child: CoverCard(drama: drama, showTitle: false, onTap: () => openDrama(context, drama))),
+          SizedBox(
+            width: 56,
+            height: 76,
+            child: CoverCard(
+              drama: drama,
+              showTitle: false,
+              heroTag: 'rank-${drama.id}',
+              onTap: () => openDrama(context, drama, heroTag: 'rank-${drama.id}'),
+            ),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

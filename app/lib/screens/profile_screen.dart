@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/app_info.dart';
 import '../core/theme.dart';
 import '../state/app_state.dart';
 
@@ -110,7 +111,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 22),
             Center(
               child: Text(
-                '果果短剧 iOS · 0.1.0',
+                '$kAppName iOS · $kAppVersion',
                 style: TextStyle(fontSize: 11.5, color: palette.textDim.withValues(alpha: 0.7)),
               ),
             ),
@@ -173,8 +174,10 @@ class _InfoRow extends StatelessWidget {
       child: Row(
         children: [
           Text(label, style: TextStyle(fontSize: 13.5, color: palette.text)),
-          const Spacer(),
-          Flexible(
+          const SizedBox(width: 16),
+          // 用 Expanded 让右侧值占满剩余宽度；原来 Spacer + Flexible 会平分空间，
+          // 长地址被硬生生截掉一半
+          Expanded(
             child: Text(
               value,
               maxLines: 1,

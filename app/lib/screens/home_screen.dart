@@ -98,7 +98,8 @@ class HomeScreen extends StatelessWidget {
                       return CoverCard(
                         drama: drama,
                         badge: drama.episodeCount > 0 ? '${drama.episodeCount}集' : null,
-                        onTap: () => openDrama(context, drama),
+                        heroTag: 'library-${drama.id}',
+                        onTap: () => openDrama(context, drama, heroTag: 'library-${drama.id}'),
                       );
                     },
                     childCount: list.length,
@@ -133,7 +134,8 @@ class HomeScreen extends StatelessWidget {
                   child: CoverCard(
                     drama: drama,
                     badge: drama.episodeCount > 0 ? '${drama.episodeCount}集' : null,
-                    onTap: () => openDrama(context, drama),
+                    heroTag: 'featured-${drama.id}',
+                    onTap: () => openDrama(context, drama, heroTag: 'featured-${drama.id}'),
                   ),
                 );
               },

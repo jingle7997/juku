@@ -228,6 +228,8 @@ SHOTS = {
     "home": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": []},
     "discover": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": [(146, 806)]},
     "following": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": [(243, 806)]},
+    # 追剧页的「记录」分段：先进追剧 tab，再点右半段
+    "history": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": [(243, 806), (284, 78)]},
     "profile": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": [(341, 806)]},
 }
 

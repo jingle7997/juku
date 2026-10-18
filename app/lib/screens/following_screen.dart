@@ -90,11 +90,15 @@ class _FollowingScreenState extends State<FollowingScreen> {
 
   Future<void> _remove(LibraryEntry entry) async {
     final state = context.read<AppState>();
-    if (_tab == 0) {
-      final drama = state.dramaById(entry.dramaId);
-      if (drama != null) await state.toggleFollowing(drama);
-    } else {
-      await state.clearHistory(dramaId: entry.dramaId);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      if (_tab == 0) {
+        await state.unfollow(entry.dramaId);
+      } else {
+        await state.clearHistory(dramaId: entry.dramaId);
+      }
+    } catch (_) {
+      messenger.showSnackBar(const SnackBar(content: Text('删除失败，请稍后重试')));
     }
   }
 }
@@ -111,14 +115,20 @@ class _EntryRow extends StatelessWidget {
     final palette = AppPalette.of(context);
     final state = context.read<AppState>();
     final drama = entry.drama ?? state.dramaById(entry.dramaId);
-    final title = drama?.title ?? entry.dramaId;
+    // 本地剧库没这部剧时，用服务端给的剧名兜底，别把 hongguo:123 这种 id 露出来
+    final title = drama?.title ?? (entry.title.isNotEmpty ? entry.title : entry.dramaId);
     final progress = entry.progress;
     final stamp = entry.updatedAt;
+    final subtitle = mode == 1
+        ? (entry.episodeLabel.isNotEmpty
+            ? '看到${entry.episodeLabel}'
+            : (entry.episode > 0 ? '看到第 ${entry.episode} 集' : (drama?.subtitle ?? '')))
+        : (entry.total > 0 ? '共 ${entry.total} 集' : (drama?.subtitle ?? ''));
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {
-        if (drama != null) openDrama(context, drama);
+        if (drama != null) openDrama(context, drama, heroTag: 'entry-${entry.dramaId}');
       },
       onLongPress: onRemove,
       child: Row(
@@ -128,7 +138,12 @@ class _EntryRow extends StatelessWidget {
             width: 66,
             height: 90,
             child: drama != null
-                ? CoverCard(drama: drama, showTitle: false, onTap: () => openDrama(context, drama))
+                ? CoverCard(
+                    drama: drama,
+                    showTitle: false,
+                    heroTag: 'entry-${entry.dramaId}',
+                    onTap: () => openDrama(context, drama, heroTag: 'entry-${entry.dramaId}'),
+                  )
                 : Container(
                     decoration: BoxDecoration(color: palette.surfaceHigh, borderRadius: BorderRadius.circular(AppRadius.card)),
                   ),
@@ -147,9 +162,7 @@ class _EntryRow extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  entry.episode > 0
-                      ? (mode == 1 ? '看到第 ${entry.episode} 集' : '更新至第 ${entry.episode} 集')
-                      : (drama?.subtitle ?? ''),
+                  subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: palette.textDim),

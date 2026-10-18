@@ -50,7 +50,7 @@ COLORS = [
 def make_drama(index: int):
     title, category, source, episodes = TITLES[index % len(TITLES)]
     return {
-        "id": f"d{index:03d}",
+        "id": f"{source}:{index}",
         "title": title,
         "name": title,
         "source": source,
@@ -148,20 +148,36 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, {"data": hits})
             return
         if path == "/api/ui/following":
+            # 与真实服务端 followingView 一致：不内嵌 drama 对象，
+            # 只给 dramaId / title / knownEpisodes。App 必须能靠这些字段兜底。
             self._send(200, {"data": [
-                {"dramaId": DRAMAS[0]["id"], "drama": DRAMAS[0], "episode": 23, "position": 0, "duration": 0},
-                {"dramaId": DRAMAS[1]["id"], "drama": DRAMAS[1], "episode": 8, "position": 0, "duration": 0},
-                {"dramaId": DRAMAS[6]["id"], "drama": DRAMAS[6], "episode": 41, "position": 0, "duration": 0},
-            ]})
+                {"dramaId": DRAMAS[0]["id"], "source": DRAMAS[0]["source"], "title": DRAMAS[0]["title"],
+                 "saved": True, "completed": False, "knownEpisodes": DRAMAS[0]["episodeCount"],
+                 "addedAt": "2026-10-10T08:00:00Z", "updatedAt": "2026-10-18T09:20:00Z"},
+                {"dramaId": DRAMAS[1]["id"], "source": DRAMAS[1]["source"], "title": DRAMAS[1]["title"],
+                 "saved": True, "completed": False, "knownEpisodes": DRAMAS[1]["episodeCount"],
+                 "addedAt": "2026-10-12T08:00:00Z", "updatedAt": "2026-10-17T20:05:00Z"},
+                {"dramaId": DRAMAS[6]["id"], "source": DRAMAS[6]["source"], "title": DRAMAS[6]["title"],
+                 "saved": True, "completed": False, "knownEpisodes": DRAMAS[6]["episodeCount"],
+                 "addedAt": "2026-10-14T08:00:00Z", "updatedAt": "2026-10-16T22:40:00Z"},
+            ], "limit": 500})
             return
         if path == "/api/ui/playback/history":
+            # 注意：真实服务端的 episode 是**字符串**（"第12集"），
+            # 集数在 index 里。之前 mock 这里给的是数字，掩盖了 App 的类型错误。
             self._send(200, {"data": [
-                {"dramaId": DRAMAS[2]["id"], "drama": DRAMAS[2], "episode": 12, "position": 640, "duration": 1500,
-                 "updatedAt": "2026-10-18T12:30:00Z"},
-                {"dramaId": DRAMAS[4]["id"], "drama": DRAMAS[4], "episode": 3, "position": 120, "duration": 1400,
-                 "updatedAt": "2026-10-17T21:10:00Z"},
-                {"dramaId": DRAMAS[9]["id"], "drama": DRAMAS[9], "episode": 55, "position": 1400, "duration": 1400,
-                 "updatedAt": "2026-10-16T09:00:00Z"},
+                {"dramaId": DRAMAS[2]["id"], "source": DRAMAS[2]["source"], "title": DRAMAS[2]["title"],
+                 "chapterId": "c12", "episode": "第12集", "index": 12, "total": DRAMAS[2]["episodeCount"],
+                 "position": 640.0, "duration": 1500.0, "completed": False, "mode": "online",
+                 "watchedAt": "2026-10-18T12:30:00Z"},
+                {"dramaId": DRAMAS[4]["id"], "source": DRAMAS[4]["source"], "title": DRAMAS[4]["title"],
+                 "chapterId": "c3", "episode": "第3集", "index": 3, "total": DRAMAS[4]["episodeCount"],
+                 "position": 120.0, "duration": 1400.0, "completed": False, "mode": "online",
+                 "watchedAt": "2026-10-17T21:10:00Z"},
+                {"dramaId": DRAMAS[9]["id"], "source": DRAMAS[9]["source"], "title": DRAMAS[9]["title"],
+                 "chapterId": "c55", "episode": "第55集", "index": 55, "total": DRAMAS[9]["episodeCount"],
+                 "position": 1400.0, "duration": 1400.0, "completed": True, "mode": "online",
+                 "watchedAt": "2026-10-16T09:00:00Z"},
             ], "limit": 500})
             return
         self._send(404, {"error": "not found"})
@@ -203,10 +219,30 @@ class Handler(BaseHTTPRequestHandler):
             })
             return
         if parsed.path == "/api/ui/playback/progress":
-            self._send(200, {"ok": True})
+            # 与真实服务端一致：只认 {session, progress:{...}} 嵌套结构，
+            # progress 里字段必须齐全（真服务端开了 DisallowUnknownFields）。
+            progress = body.get("progress")
+            if not body.get("session") or not isinstance(progress, dict):
+                self._send(400, {"error": "播放请求无效（需要 session + progress）"})
+                return
+            missing = [k for k in ("run", "sequence", "episode", "position", "duration", "completed")
+                       if k not in progress]
+            if missing:
+                self._send(400, {"error": "播放请求无效（progress 缺少 " + ",".join(missing) + "）"})
+                return
+            self._send(200, {"saved": True, "entry": {"dramaId": "mock", "index": progress["episode"]}})
             return
         if parsed.path == "/api/ui/playback/control":
-            self._send(200, {"ok": True})
+            if not body.get("session") or body.get("action") not in ("close", "heartbeat"):
+                self._send(400, {"error": "不支持的播放操作"})
+                return
+            progress = body.get("progress")
+            if isinstance(progress, dict) and (not progress.get("run") or not progress.get("sequence")):
+                # 真服务端把 run==0 / sequence==0 判为「观看进度无效」，
+                # 会话照常关闭，但进度会丢。这里回同样的 historyError 好暴露问题。
+                self._send(200, {"ok": True, "historyError": "观看进度无效"})
+                return
+            self._send(200, {"ok": True, "historyError": ""})
             return
         if parsed.path == "/api/ui/following":
             self._send(200, {"entry": {"saved": bool(body.get("saved"))}})
