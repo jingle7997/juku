@@ -1,0 +1,64 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "app/lib/**"
+      - "app/ios/**"
+      - "app/pubspec.yaml"
+      - "app/pubspec.lock"
+      - "app/analysis_options.yaml"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+# App 在 app/ 子目录里，所有 run 步骤默认在那里执行
+defaults:
+  run:
+    working-directory: app
+
+jobs:
+  build:
+    name: Build unsigned IPA
+    runs-on: macos-15
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.7"
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Build (no codesign)
+        run: flutter build ios --release --no-codesign
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP_PATH="build/ios/iphoneos/Runner.app"
+          test -d "$APP_PATH"
+          rm -rf Payload juku-unsigned.ipa
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          # 未签名包：移除可能残留的签名信息，方便 AltStore / Sideloadly 重签
+          rm -rf Payload/Runner.app/_CodeSignature
+          zip -qry juku-unsigned.ipa Payload
+          ls -lh juku-unsigned.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: juku-ios-ipa
+          path: app/juku-unsigned.ipa
+          retention-days: 30

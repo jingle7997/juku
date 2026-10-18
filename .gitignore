@@ -1,0 +1,19 @@
+.DS_Store
+/data/
+/dist/
+/短剧下载/
+/config.json
+/juku-settings.json
+/settings.json
+/library.json
+/ui-state.json
+/failed.json
+/juku
+/juku.exe
+# FFmpeg 及各平台运行时都是启动后自动下载的，不入库
+/bin/
+# go test 在 internal/app 下运行会生成 data/，属测试残留
+/internal/app/data/
+# 本地出的未签名包
+/app/juku-unsigned.ipa
+/Payload/
