@@ -12,26 +12,26 @@ TITLES = [
     ("闪婚后，大叔每天想官宣", "都市", "hongguo", 86),
     ("病娇大佬的心尖宠", "甜宠", "huangguo", 92),
     ("重生之我在豪门当团宠", "逆袭", "hongguo", 78),
-    ("长嫂如母", "古装", "juguo", 64),
+    ("长嫂如母", "古装", "huangju", 64),
     ("末世第一女王", "悬疑", "yeguo", 71),
     ("离婚后她惊艳全球", "都市", "hongguo", 88),
     ("我的九个师姐绝色倾城", "玄幻", "huangdou", 96),
-    ("医妃惊华", "古装", "diguo", 60),
+    ("医妃惊华", "古装", "dsd", 60),
     ("开局签到荒古圣体", "玄幻", "huangdou", 100),
     ("偏执老公宠上瘾", "甜宠", "huangguo", 82),
     ("一胎双宝：总裁爹地宠上天", "甜宠", "hongguo", 74),
     ("战神归来", "逆袭", "yeguo", 90),
-    ("夜夜笙歌", "悬疑", "juguo", 58),
+    ("夜夜笙歌", "悬疑", "huangju", 58),
     ("天降萌宝：妈咪快跑", "甜宠", "hongguo", 80),
     ("重生八零：媳妇有点辣", "年代", "huangguo", 66),
-    ("陆少的隐婚新娘", "都市", "diguo", 84),
+    ("陆少的隐婚新娘", "都市", "dsd", 84),
     ("师尊在上", "古装", "huangdou", 62),
     ("万人迷她只想搞事业", "都市", "hongguo", 76),
     ("总裁的贴身保镖", "都市", "yeguo", 70),
-    ("我在仙界送外卖", "玄幻", "juguo", 54),
+    ("我在仙界送外卖", "玄幻", "huangju", 54),
     ("错嫁良缘", "古装", "huangguo", 68),
     ("暴富从捡漏开始", "逆袭", "hongguo", 87),
-    ("娇妻别想逃", "甜宠", "diguo", 79),
+    ("娇妻别想逃", "甜宠", "dsd", 79),
     ("隐世高手在都市", "都市", "huangdou", 93),
 ]
 
@@ -128,22 +128,30 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/ui/rankings":
             board = query.get("board", [""])[0]
             if not board:
-                # 与真实服务端 rankingBoard 一致，带上 description
+                # 与真实服务端 rankingBoard 一致，带上 description；
+                # source 必须用服务端真实 id（huangju / dsd），别用 juguo / diguo
                 self._send(200, {"boards": [
                     {"id": "hot", "name": "热播榜", "source": "hongguo",
                      "description": "红果观看、互动等综合热度；每日更新。"},
                     {"id": "new", "name": "新剧榜", "source": "huangguo",
                      "description": "黄果站点新剧 TOP 20；每日更新。"},
-                    {"id": "rise", "name": "飙升榜", "source": "juguo",
+                    {"id": "rise", "name": "飙升榜", "source": "huangju",
                      "description": "剧果目录飙升顺序，按源站返回顺序展示。"},
+                    {"id": "dsd-top", "name": "目录榜", "source": "dsd",
+                     "description": "帝果分类目录聚合顺序，按源站返回顺序展示。"},
                 ]})
                 return
-            source = {"hot": "hongguo", "new": "huangguo", "rise": "juguo"}.get(board, "")
+            sources = {"hot": "hongguo", "new": "huangguo", "rise": "huangju", "dsd-top": "dsd"}
+            source = sources.get(board, "")
             page_text = (query.get("page", ["1"])[0] or "1").strip()
             if not page_text.isdigit() or int(page_text) < 1:
                 self._send(400, {"error": "榜单或页码无效"})
                 return
             page = int(page_text)
+            # 黄果、帝果是单页榜单（对应服务端 singlePageRankingBoard）
+            if source in ("huangguo", "dsd") and page != 1:
+                self._send(400, {"error": "榜单或页码无效"})
+                return
             pool = [d for d in DRAMAS if not source or d["source"] == source] or DRAMAS
             per_page = 6
             start = (page - 1) * per_page

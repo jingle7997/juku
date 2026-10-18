@@ -4,13 +4,18 @@ import '../core/api.dart';
 import '../core/prefs.dart';
 import '../models/drama.dart';
 
+/// 站源 id → 中文名。**必须与服务端 `internal/app/account_source_catalog.go`
+/// 的 `accountSourceChoices` 保持一致**：id 对不上时，换源面板和榜单列表里
+/// 会直接露出 `huangju` / `dsd` 这种英文 key。
+///
+/// 顺序也跟服务端一致，换源面板按这个顺序排列。
 const Map<String, String> kSourceLabels = {
   'huangguo': '黄果',
   'huangdou': '黄豆',
   'hongguo': '红果',
-  'juguo': '剧果',
+  'huangju': '剧果',
   'yeguo': '野果',
-  'diguo': '帝果',
+  'dsd': '帝果',
   'yaguo': '芽果',
   'maoguo': '猫果',
   'fanguo': '饭果',
@@ -19,10 +24,17 @@ const Map<String, String> kSourceLabels = {
   'xingguo': '星果',
   'huaguo': '花果',
   'niuguo': '牛果',
-  'wangguo': '网果',
-  'faguo': '发果',
   'piguo': '皮果',
   'wuguo': '伍果',
+  // 下面几个 id 服务端并不存在，只是早期版本用过 / 猜过的写法。
+  // 留着是为了老缓存里的数据还能显示成中文，不要主动产生这些 id。
+  'juguo': '剧果',
+  'diguo': '帝果',
+  'wangguo': '网果',
+  'faguo': '发果',
+  // 黄果的内部子源，正常不会单独出现，兜个中文名免得露出 key
+  'huangguoai': '黄果AI',
+  'huangguo-video': '黄果视频',
 };
 
 String sourceLabel(String key) => kSourceLabels[key] ?? (key.isEmpty ? '剧库' : key);

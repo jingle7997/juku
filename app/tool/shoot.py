@@ -231,6 +231,8 @@ SHOTS = {
     # 追剧页的「记录」分段：先进追剧 tab，再点右半段
     "history": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": [(243, 806), (284, 78)]},
     "profile": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": [(341, 806)]},
+    # 换源面板：「我的 → 站源 → 切换站源」
+    "source-sheet": {"seed": {"serverUrl": "http://127.0.0.1:8999"}, "clicks": [(341, 806), (195, 295)]},
 }
 
 
