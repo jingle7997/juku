@@ -22,8 +22,16 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   List<RankingItem> _items = const [];
   String? _boardId;
   bool _loading = false;
+  bool _loadingMore = false;
+  bool _hasMore = false;
+  int _page = 1;
+  String _updatedText = '';
+  String _warning = '';
   String? _error;
   String _lastSource = '';
+  /// 榜单请求令牌：连点几个榜单 tab 时只认最后一次，否则先发的慢请求
+  /// 会把后发的结果盖掉，列表和选中的 tab 对不上。
+  int _token = 0;
 
   @override
   void initState() {
@@ -50,7 +58,20 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
     _lastSource = source;
     final visible = _visibleBoards(source);
     if (visible.isEmpty) {
-      if (mounted) setState(() => _items = const []);
+      // 作废在途请求，同时把 loading 复位：令牌对不上时 finally 不会兜底，
+      // 不复位就会一直卡在骨架屏上。
+      _token++;
+      if (mounted) {
+        setState(() {
+          _items = const [];
+          _boardId = null;
+          _loading = false;
+          _loadingMore = false;
+          _hasMore = false;
+          _updatedText = '';
+          _warning = '';
+        });
+      }
       return;
     }
     if (_boardId == null || !visible.any((board) => board.id == _boardId)) {
@@ -66,13 +87,14 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
   Future<void> _loadBoards() async {
     final api = context.read<AppState>().api;
     if (api == null) return;
+    final token = ++_token;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final boards = await api.rankingBoards();
-      if (!mounted) return;
+      if (!mounted || token != _token) return;
       final source = context.read<AppState>().selectedSource;
       _lastSource = source;
       final visible = source.isEmpty ? boards : boards.where((board) => board.source == source).toList();
@@ -82,31 +104,65 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
       });
       if (_boardId != null) await _loadItems(_boardId!);
     } on ApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (!mounted || token != _token) return;
+      setState(() => _error = error.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && token == _token) setState(() => _loading = false);
     }
   }
 
-  Future<void> _loadItems(String boardId) async {
+  Future<void> _loadItems(String boardId, {int page = 1, bool append = false}) async {
     final api = context.read<AppState>().api;
     if (api == null) return;
+    final token = ++_token;
     setState(() {
-      _loading = true;
+      if (append) {
+        _loadingMore = true;
+      } else {
+        // 换榜单时先清空：否则上一个榜单的条目会挂着，等新数据回来才替换
+        _loading = true;
+        _items = const [];
+        _hasMore = false;
+        _updatedText = '';
+        _warning = '';
+      }
       _boardId = boardId;
+      _error = null;
     });
     try {
-      final items = await api.rankingItems(boardId, 1);
-      if (!mounted) return;
+      final result = await api.rankingItems(boardId, page);
+      if (!mounted || token != _token) return;
       setState(() {
-        _items = items;
-        _error = null;
+        _items = append ? [..._items, ...result.items] : result.items;
+        _page = result.page;
+        _hasMore = result.hasMore;
+        _updatedText = result.updatedText;
+        _warning = result.warning;
       });
     } on ApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (!mounted || token != _token) return;
+      setState(() => _error = error.message);
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && token == _token) {
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+        });
+      }
     }
+  }
+
+  void _loadMore() {
+    final boardId = _boardId;
+    if (boardId == null || _loadingMore || !_hasMore) return;
+    _loadItems(boardId, page: _page + 1, append: true);
+  }
+
+  RankingBoard? get _currentBoard {
+    for (final board in _boards) {
+      if (board.id == _boardId) return board;
+    }
+    return null;
   }
 
   @override
@@ -176,7 +232,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
             SliverToBoxAdapter(
               child: SectionHeader(
                 title: '热门榜单',
-                subtitle: state.selectedSource.isEmpty ? '按站源实时抓取' : '${state.selectedSourceLabel}榜单',
+                subtitle: _updatedText.isNotEmpty
+                    ? _updatedText
+                    : (state.selectedSource.isEmpty ? '按站源实时抓取' : '${state.selectedSourceLabel}榜单'),
               ),
             ),
             if (boards.isNotEmpty)
@@ -217,6 +275,34 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   ),
                 ),
               ),
+            if (_boardNote.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Text(
+                    _boardNote,
+                    style: TextStyle(fontSize: 11.5, height: 1.45, color: palette.textDim),
+                  ),
+                ),
+              ),
+            if (_warning.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 13, color: palette.accent.withValues(alpha: 0.9)),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          _warning,
+                          style: TextStyle(fontSize: 11.5, color: palette.accent.withValues(alpha: 0.9)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             if (_loading && _items.isEmpty)
               const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.only(top: 12), child: LoadingGrid(count: 6)))
             else if (_items.isEmpty)
@@ -235,9 +321,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   ),
                 ),
               )
-            else
+            else ...[
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                 sliver: SliverList.separated(
                   itemCount: _items.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -247,10 +333,44 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   },
                 ),
               ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 110),
+                  child: Center(child: _footer(palette)),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  /// 当前榜单的说明：优先用服务端给的 description，没有就用站源名兜底。
+  String get _boardNote {
+    final board = _currentBoard;
+    if (board == null) return '';
+    return board.description;
+  }
+
+  Widget _footer(AppPalette palette) {
+    if (_loadingMore) {
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white38),
+      );
+    }
+    if (_hasMore) {
+      return GhostButton(
+        label: '加载更多',
+        icon: Icons.expand_more_rounded,
+        onPressed: _loadMore,
+      );
+    }
+    // 只有一页的榜单（黄果、帝果）不显示「已到底」，避免看起来像出错
+    if (_page <= 1) return const SizedBox.shrink();
+    return Text('已经到底了', style: TextStyle(fontSize: 11.5, color: palette.textDim));
   }
 }
 

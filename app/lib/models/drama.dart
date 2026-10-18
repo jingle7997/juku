@@ -105,16 +105,20 @@ class DramaPage {
 }
 
 class RankingBoard {
-  const RankingBoard({required this.id, required this.name, required this.source});
+  const RankingBoard({required this.id, required this.name, required this.source, this.description = ''});
   final String id;
   final String name;
   final String source;
+
+  /// 榜单说明，服务端每个榜单都带一句，例如「红果观看、互动等综合热度；每日更新。」
+  final String description;
 
   factory RankingBoard.fromJson(Map<String, dynamic> json) {
     return RankingBoard(
       id: (json['id'] ?? json['boardId'] ?? '').toString(),
       name: (json['name'] ?? json['title'] ?? '榜单').toString(),
       source: (json['source'] ?? '').toString(),
+      description: (json['description'] ?? json['desc'] ?? '').toString().trim(),
     );
   }
 }
@@ -126,8 +130,47 @@ class RankingItem {
 
   factory RankingItem.fromJson(Map<String, dynamic> json) {
     return RankingItem(
-      rank: (json['rank'] as num?)?.toInt() ?? 0,
+      rank: _asInt(json['rank']),
       drama: Drama.fromJson((json['drama'] as Map?)?.cast<String, dynamic>() ?? const {}),
+    );
+  }
+}
+
+/// 榜单的一页。服务端返回 `{boardId, page, items, hasMore, totalPages,
+/// updatedText, stale, warning}` —— 原来只取 items，分页和更新时间全丢了。
+class RankingPage {
+  const RankingPage({
+    this.items = const [],
+    this.page = 1,
+    this.hasMore = false,
+    this.totalPages = 0,
+    this.updatedText = '',
+    this.warning = '',
+  });
+
+  final List<RankingItem> items;
+  final int page;
+  final bool hasMore;
+  final int totalPages;
+  final String updatedText;
+  final String warning;
+
+  factory RankingPage.fromJson(Map<String, dynamic> json) {
+    final raw = json['items'];
+    final items = raw is List
+        ? raw
+            .whereType<Map>()
+            .map((e) => RankingItem.fromJson(e.cast<String, dynamic>()))
+            .where((e) => e.drama.id.isNotEmpty)
+            .toList()
+        : const <RankingItem>[];
+    return RankingPage(
+      items: items,
+      page: _asInt(json['page']) > 0 ? _asInt(json['page']) : 1,
+      hasMore: json['hasMore'] == true,
+      totalPages: _asInt(json['totalPages']),
+      updatedText: (json['updatedText'] ?? '').toString().trim(),
+      warning: (json['warning'] ?? '').toString().trim(),
     );
   }
 }

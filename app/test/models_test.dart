@@ -124,4 +124,49 @@ void main() {
       expect(session.episodes.first.index, 1);
     });
   });
+
+  group('榜单解析', () {
+    test('board 带 description', () {
+      final board = RankingBoard.fromJson({
+        'id': 'hongguo-hot',
+        'name': '总热播榜',
+        'source': 'hongguo',
+        'description': '红果观看、互动等综合热度；每日更新。',
+      });
+      expect(board.id, 'hongguo-hot');
+      expect(board.description, '红果观看、互动等综合热度；每日更新。');
+      expect(RankingBoard.fromJson({'id': 'x', 'name': 'y'}).description, '');
+    });
+
+    test('page 的 hasMore / updatedText / totalPages 都能读', () {
+      final page = RankingPage.fromJson({
+        'boardId': 'hongguo-hot',
+        'page': 2,
+        'items': [
+          {'rank': 7, 'drama': {'id': 'hongguo:7', 'name': '第七部'}},
+          {'rank': 0, 'drama': {'id': '', 'name': '没有 id 的会被丢掉'}},
+        ],
+        'hasMore': true,
+        'totalPages': 5,
+        'updatedText': '5 分钟前更新',
+        'warning': '部分剧集抓取失败',
+      });
+      expect(page.page, 2);
+      expect(page.items.length, 1);
+      expect(page.items.first.rank, 7);
+      expect(page.items.first.drama.title, '第七部');
+      expect(page.hasMore, isTrue);
+      expect(page.totalPages, 5);
+      expect(page.updatedText, '5 分钟前更新');
+      expect(page.warning, '部分剧集抓取失败');
+    });
+
+    test('空响应退化成空页而不是抛异常', () {
+      final page = RankingPage.fromJson({});
+      expect(page.items, isEmpty);
+      expect(page.page, 1);
+      expect(page.hasMore, isFalse);
+      expect(page.updatedText, '');
+    });
+  });
 }

@@ -128,16 +128,36 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/ui/rankings":
             board = query.get("board", [""])[0]
             if not board:
+                # 与真实服务端 rankingBoard 一致，带上 description
                 self._send(200, {"boards": [
-                    {"id": "hot", "name": "热播榜", "source": "hongguo"},
-                    {"id": "new", "name": "新剧榜", "source": "huangguo"},
-                    {"id": "rise", "name": "飙升榜", "source": "juguo"},
+                    {"id": "hot", "name": "热播榜", "source": "hongguo",
+                     "description": "红果观看、互动等综合热度；每日更新。"},
+                    {"id": "new", "name": "新剧榜", "source": "huangguo",
+                     "description": "黄果站点新剧 TOP 20；每日更新。"},
+                    {"id": "rise", "name": "飙升榜", "source": "juguo",
+                     "description": "剧果目录飙升顺序，按源站返回顺序展示。"},
                 ]})
                 return
             source = {"hot": "hongguo", "new": "huangguo", "rise": "juguo"}.get(board, "")
+            page_text = (query.get("page", ["1"])[0] or "1").strip()
+            if not page_text.isdigit() or int(page_text) < 1:
+                self._send(400, {"error": "榜单或页码无效"})
+                return
+            page = int(page_text)
             pool = [d for d in DRAMAS if not source or d["source"] == source] or DRAMAS
-            items = [{"rank": i + 1, "drama": d} for i, d in enumerate(pool[:14])]
-            self._send(200, {"boardId": board, "page": 1, "items": items, "updatedText": "刚刚更新"})
+            per_page = 6
+            start = (page - 1) * per_page
+            chunk = pool[start:start + per_page]
+            total_pages = max(1, -(-len(pool) // per_page))
+            items = [{"rank": start + i + 1, "drama": d} for i, d in enumerate(chunk)]
+            self._send(200, {
+                "boardId": board,
+                "page": page,
+                "items": items,
+                "hasMore": start + per_page < len(pool),
+                "totalPages": total_pages,
+                "updatedText": "刚刚更新",
+            })
             return
         if path == "/api/ui/categories":
             self._send(200, {"items": ["都市", "甜宠", "逆袭", "古装", "悬疑", "玄幻", "年代"]})

@@ -154,12 +154,11 @@ class ApiClient {
         .toList();
   }
 
-  Future<List<RankingItem>> rankingItems(String boardId, int page) async {
+  /// 拉榜单的一页。服务端带 hasMore / updatedText / warning，别再只取 items。
+  Future<RankingPage> rankingItems(String boardId, int page) async {
     final json = await _send('/api/ui/rankings', query: {'board': boardId, 'page': '$page'});
     final map = json is Map ? json.cast<String, dynamic>() : const <String, dynamic>{};
-    final raw = map['items'];
-    if (raw is! List) return const [];
-    return raw.whereType<Map>().map((e) => RankingItem.fromJson(e.cast<String, dynamic>())).toList();
+    return RankingPage.fromJson(map);
   }
 
   Future<List<String>> categories(String source) async {
