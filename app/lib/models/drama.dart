@@ -183,8 +183,8 @@ class LibraryEntry {
       dramaId: (json['dramaId'] ?? json['id'] ?? '').toString(),
       drama: raw is Map ? Drama.fromJson(raw.cast<String, dynamic>()) : null,
       episode: index > 0 ? index : _asInt(rawEpisode),
-      position: (json['position'] as num?)?.toDouble() ?? 0,
-      duration: (json['duration'] as num?)?.toDouble() ?? 0,
+      position: _asDouble(json['position']),
+      duration: _asDouble(json['duration']),
       updatedAt: stamp is num
           ? DateTime.fromMillisecondsSinceEpoch(
               stamp > 100000000000 ? stamp.toInt() : stamp.toInt() * 1000,
@@ -327,5 +327,13 @@ int _asInt(Object? value) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   if (value is String) return int.tryParse(value.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+  return 0;
+}
+
+/// 宽松转 double：position / duration 正常是数字，但也见过 "120.5" 这种字符串。
+double _asDouble(Object? value) {
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value.trim()) ?? 0;
   return 0;
 }

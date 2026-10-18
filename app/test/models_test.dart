@@ -58,6 +58,18 @@ void main() {
       final millis = LibraryEntry.fromJson({'dramaId': 'x:1', 'updatedAt': 1760000000000});
       expect(seconds.updatedAt!.year, millis.updatedAt!.year);
     });
+
+    test('position / duration 是字符串时不抛异常', () {
+      final entry = LibraryEntry.fromJson({
+        'dramaId': 'x:1',
+        'position': '640.5',
+        'duration': '1500',
+      });
+      expect(entry.position, 640.5);
+      expect(entry.duration, 1500);
+      expect(entry.progress, closeTo(640.5 / 1500, 1e-6));
+      expect(LibraryEntry.fromJson({'dramaId': 'x:1'}).progress, 0);
+    });
   });
 
   group('PlaybackQuality 解析', () {
