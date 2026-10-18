@@ -37,6 +37,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      # Flutter 3.47 默认启用 Swift Package Manager：插件全走 SPM 时，
+      # 项目里保留的 CocoaPods 集成会在 Xcode 构建阶段报
+      # "The sandbox is not in sync with the Podfile.lock"（pod install 与
+      # 构建期生成的 lock 对不上）。项目仍在用 CocoaPods 集成，先关掉 SPM。
+      - name: Disable Swift Package Manager
+        run: flutter config --no-enable-swift-package-manager
+
       - name: Analyze
         run: flutter analyze
 
