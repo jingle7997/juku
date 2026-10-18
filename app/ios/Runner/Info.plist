@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>短剧库</string>
+	<string>果果短剧</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,7 +34,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>用于发现并连接局域网内的短剧库服务。</string>
+	<string>用于发现并连接局域网内的果果短剧服务。</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_juku-link._tcp</string>

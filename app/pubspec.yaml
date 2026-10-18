@@ -1,5 +1,5 @@
 name: juku
-description: 短剧库 iOS 客户端
+description: 果果短剧 iOS 客户端
 publish_to: "none"
 version: 0.1.0+1
 
@@ -24,3 +24,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icon/

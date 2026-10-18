@@ -1,11 +1,11 @@
 {
-    "name": "juku",
-    "short_name": "juku",
+    "name": "果果短剧",
+    "short_name": "果果短剧",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#08080C",
+    "theme_color": "#FF4D6D",
+    "description": "果果短剧 iOS 客户端",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

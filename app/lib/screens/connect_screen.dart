@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/api.dart';
 import '../core/theme.dart';
 import '../state/app_state.dart';
+import '../widgets/brand_mark.dart';
 import '../widgets/chrome.dart';
 
 class ConnectScreen extends StatefulWidget {
@@ -82,21 +83,11 @@ class _ConnectScreenState extends State<ConnectScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(24, 48, 24, 32),
               children: [
-                Container(
-                  width: 68,
-                  height: 68,
-                  decoration: BoxDecoration(
-                    gradient: palette.accentGradient,
-                    borderRadius: BorderRadius.circular(19),
-                    boxShadow: [
-                      BoxShadow(color: palette.accent.withValues(alpha: 0.35), blurRadius: 26, offset: const Offset(0, 10)),
-                    ],
-                  ),
-                  child: const Icon(Icons.play_arrow_rounded, size: 40, color: Colors.white),
-                ),
+                // ListView 会给子项紧宽度约束，不套 Align 的话 68x68 会被拉成整行宽
+                const Align(alignment: Alignment.centerLeft, child: BrandMark(68)),
                 const SizedBox(height: 22),
                 Text(
-                  '短剧库',
+                  '果果短剧',
                   style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: palette.text, letterSpacing: -0.8),
                 ),
                 const SizedBox(height: 8),

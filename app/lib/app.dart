@@ -19,7 +19,7 @@ class JukuApp extends StatelessWidget {
       child: Consumer<AppState>(
         builder: (context, state, _) {
           return MaterialApp(
-            title: '短剧库',
+            title: '果果短剧',
             debugShowCheckedModeBanner: false,
             theme: buildTheme(AppPalette.light, Brightness.light),
             darkTheme: buildTheme(AppPalette.dark, Brightness.dark),

@@ -1,4 +1,4 @@
-# 短剧库 iOS 客户端
+# 果果短剧 iOS 客户端
 
 参照「秋秋短剧」的技术路线与交互做的 iOS 客户端：**Flutter（Dart 3）**，
 通过 HTTP 直连运行在电脑 / NAS 上的短剧库服务。App 只负责「浏览 + 播放 + 追剧」，
@@ -10,15 +10,15 @@ App 与服务端唯一的耦合是下面「用到的服务端接口」那张表 
 
 ## 界面预览
 
-| 首页 | 发现 / 榜单 | 我的剧集 | 详情 | 我的 |
-| --- | --- | --- | --- | --- |
-| ![](preview/home.png) | ![](preview/discover.png) | ![](preview/following.png) | ![](preview/detail.png) | ![](preview/profile.png) |
+| 连接 | 首页 | 发现 / 榜单 | 我的剧集 | 详情 | 我的 |
+| --- | --- | --- | --- | --- | --- |
+| ![](preview/connect.png) | ![](preview/home.png) | ![](preview/discover.png) | ![](preview/following.png) | ![](preview/detail.png) | ![](preview/profile.png) |
 
 换源面板（「我的 → 站源 → 切换站源」）：
 
 <img src="preview/source-sheet.png" width="300" />
 
-> 截图来自 `flutter build web` + 本地模拟服务端，视口 390×844 @3x。
+> 截图由 `python tool/shoot.py` 生成（`flutter build web` + 本地模拟服务端，视口 390×844 @3x）。
 
 ## 换源
 
@@ -58,11 +58,16 @@ app/                          ← 本目录，Flutter 工程根
     models/   drama.dart（剧集 / 播放会话 / 取流结果）
     state/    app_state.dart（全局状态，Provider）
     screens/  连接 / 首页 / 发现 / 搜索 / 追剧 / 详情 / 播放器 / 我的
-    widgets/  封面卡、毛玻璃容器、空状态等
+    widgets/  封面卡、毛玻璃容器、空状态、BrandMark（应用图标）等
+  assets/icon/  app_icon.png，App 内品牌标用的同一张图标
   ios/        Xcode 工程（Runner，bundle id com.juku.juku，最低 iOS 15.0）
   web/        仅供本地预览界面用
-  tool/       mock_server.py（本地假数据服务端，做界面联调用）
-  preview/    界面截图
+  tool/
+    mock_server.py        本地假数据服务端（8999），做界面联调
+    shoot.py              无头 Chrome 逐页截图，界面回归用
+    make_app_icons.py     从一张 1024 源图生成全套 AppIcon
+    strip_icon_alpha.py   单独去掉图标 PNG 的 alpha 通道
+  preview/    界面截图（由 tool/shoot.py 生成）
 .github/workflows/ios.yml     ← 仓库根，macOS 云构建，产出未签名 IPA
 ```
 
@@ -95,6 +100,18 @@ python tool/mock_server.py     # 另开一个终端，起本地假数据（127.0
 flutter build web              # 浏览器里预览界面
 ```
 
+改完界面想批量截图回归（产物写进 `preview/`，390×844 @3x）：
+
+```bash
+python tool/shoot.py                  # connect / home / discover / following / profile
+python tool/shoot.py --only home      # 只截某一页
+```
+
+`shoot.py` 自带最小 WebSocket + CDP 实现，不依赖 puppeteer，用
+`Emulation.setDeviceMetricsOverride` 精确控制视口。注意它靠 `localStorage` 预置
+`serverUrl` 跳过连接页，而 `shared_preferences_web` 存值是 `json.encode` 过的，
+所以写进去的字符串要带引号（脚本里已处理）。
+
 ## 出包（未签名 IPA）
 
 iOS 编译必须用 macOS。仓库根目录自带 GitHub Actions 工作流（`.github/workflows/ios.yml`，
@@ -122,30 +139,42 @@ zip -qry juku-unsigned.ipa Payload
   但两者在同一个仓库、同一个 tag 下发布，一次 release 同时产出服务端二进制和 ipa
 - 服务端默认监听 `0.0.0.0:8998`，App 连的是 `http://电脑IP:8998`
 
-## 改名字与换图标
+## 名称与图标
 
-名称和图标都还是占位，正式定下来后按下表改（都是普通源码改动，一次提交即可，不影响已有历史）。
+当前名称 **果果短剧**，图标为红果漫剧的图标（自用占位，后续会换）。
 
-**App 名称**散落在 6 处，要一起改：
+**App 名称**散落在 6 处，改名要一起改：
 
 | 位置 | 当前值 | 影响 |
 | --- | --- | --- |
-| `ios/Runner/Info.plist` → `CFBundleDisplayName` | 短剧库 | **桌面图标下的名字**，最重要 |
-| `lib/app.dart` → `MaterialApp.title` | 短剧库 | 系统任务切换里的标题 |
-| `lib/screens/connect_screen.dart` | 短剧库 | 连接页大标题 |
-| `lib/screens/home_screen.dart` | 短剧库 | 首页标题 |
-| `lib/screens/profile_screen.dart` | 短剧库 iOS · 0.1.0 | 「我的」页版本行 |
-| `web/index.html`、`web/manifest.json` | juku | 只影响 web 预览，不影响 ipa |
+| `ios/Runner/Info.plist` → `CFBundleDisplayName` | 果果短剧 | **桌面图标下的名字**，最重要 |
+| `lib/app.dart` → `MaterialApp.title` | 果果短剧 | 系统任务切换里的标题 |
+| `lib/screens/connect_screen.dart` | 果果短剧 | 连接页大标题 |
+| `lib/screens/home_screen.dart` | 果果短剧 | 首页标题 |
+| `lib/screens/profile_screen.dart` | 果果短剧 iOS · 0.1.0 | 「我的」页版本行 |
+| `ios/Runner/Info.plist` → `NSLocalNetworkUsageDescription` | 果果短剧服务 | 局域网权限弹窗文案 |
+| `web/index.html`、`web/manifest.json` | 果果短剧 | 只影响 web 预览，不影响 ipa |
 
-**图标**只需替换 `ios/Runner/Assets.xcassets/AppIcon.appiconset/` 下的 15 个 PNG，
-尺寸必须与 `Contents.json` 声明一致（20/29/40/60/76/83.5/1024 各倍率）。
-拿一张 1024×1024 的图，用 `sips` 或任意工具批量缩放覆盖即可。
+`lib/widgets/brand_mark.dart` 里的 `BrandMark` 是 App 内的品牌标（连接页 68、首页标题 26），
+读的是 `assets/icon/app_icon.png`，和桌面图标同一张图，换图标时一起换。
+
+**换图标**只需一张 1024×1024 的正方形图，然后：
+
+```bash
+cd app
+python tool/make_app_icons.py 新图标.png      # 生成 15 个尺寸，自动去 alpha
+cp ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-1024x1024@1x.png assets/icon/app_icon.png
+```
+
+`make_app_icons.py` 会按 `Contents.json` 的声明生成全部倍率（20/29/40/60/76/83.5/1024），
+用面积平均缩放，1024 → 20 这种 50 倍降采样不会出现振铃光晕。
+web 的 favicon / PWA 图标不在这 15 个里，需要时单独替换 `web/favicon.png` 和 `web/icons/`。
 
 两条硬要求：
 
-- 1024×1024 那张**不能带 alpha 通道**，否则 App Store Connect 直接拒收。本项目图标已处理过；
-  换图后若新图带透明，跑一次 `python tool/strip_icon_alpha.py` 即可
-- 不要自己画圆角，iOS 会自动裁
+- 1024×1024 那张**不能带 alpha 通道**，否则 App Store Connect 直接拒收。
+  `make_app_icons.py` 已自动处理；若单独换了某个 PNG，跑 `python tool/strip_icon_alpha.py`
+- 不要自己画圆角，iOS 会自动裁；App 内的 `BrandMark` 才需要自己裁（按 22.4% 比例）
 
 **Bundle ID（`com.juku.juku`）才是不能随便改的那个**，见下节。
 

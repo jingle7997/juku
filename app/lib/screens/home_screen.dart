@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/theme.dart';
 import '../models/drama.dart';
 import '../state/app_state.dart';
+import '../widgets/brand_mark.dart';
 import '../widgets/chrome.dart';
 import '../widgets/cover_card.dart';
 import 'detail_screen.dart';
@@ -37,15 +38,10 @@ class HomeScreen extends StatelessWidget {
             titleSpacing: 16,
             title: Row(
               children: [
-                Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(gradient: palette.accentGradient, borderRadius: BorderRadius.circular(8)),
-                  child: const Icon(Icons.play_arrow_rounded, size: 19, color: Colors.white),
-                ),
+                const BrandMark(26, shadow: false),
                 const SizedBox(width: 9),
                 Text(
-                  '短剧库',
+                  '果果短剧',
                   style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: palette.text, letterSpacing: -0.4),
                 ),
               ],

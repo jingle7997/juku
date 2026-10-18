@@ -6,7 +6,7 @@
 
 ## iOS 客户端
 
-仓库里的 `app/` 是一个 Flutter iOS 客户端，与本服务端同仓维护。服务端负责抓源、下载、合并、Emby 导出，App 只做「浏览 + 播放 + 追剧」，通过 HTTP 连到运行本程序的电脑或 NAS。
+仓库里的 `app/` 是 iOS 客户端「果果短剧」，一个 Flutter 工程，与本服务端同仓维护。服务端负责抓源、下载、合并、Emby 导出，App 只做「浏览 + 播放 + 追剧」，通过 HTTP 连到运行本程序的电脑或 NAS。
 
 ```
 app/            Flutter 工程（lib/ ios/ tool/ preview/）

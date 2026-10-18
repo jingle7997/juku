@@ -110,7 +110,7 @@ class ProfileScreen extends StatelessWidget {
             const SizedBox(height: 22),
             Center(
               child: Text(
-                '短剧库 iOS · 0.1.0',
+                '果果短剧 iOS · 0.1.0',
                 style: TextStyle(fontSize: 11.5, color: palette.textDim.withValues(alpha: 0.7)),
               ),
             ),
