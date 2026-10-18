@@ -122,6 +122,42 @@ zip -qry juku-unsigned.ipa Payload
   但两者在同一个仓库、同一个 tag 下发布，一次 release 同时产出服务端二进制和 ipa
 - 服务端默认监听 `0.0.0.0:8998`，App 连的是 `http://电脑IP:8998`
 
+## 改名字与换图标
+
+名称和图标都还是占位，正式定下来后按下表改（都是普通源码改动，一次提交即可，不影响已有历史）。
+
+**App 名称**散落在 6 处，要一起改：
+
+| 位置 | 当前值 | 影响 |
+| --- | --- | --- |
+| `ios/Runner/Info.plist` → `CFBundleDisplayName` | 短剧库 | **桌面图标下的名字**，最重要 |
+| `lib/app.dart` → `MaterialApp.title` | 短剧库 | 系统任务切换里的标题 |
+| `lib/screens/connect_screen.dart` | 短剧库 | 连接页大标题 |
+| `lib/screens/home_screen.dart` | 短剧库 | 首页标题 |
+| `lib/screens/profile_screen.dart` | 短剧库 iOS · 0.1.0 | 「我的」页版本行 |
+| `web/index.html`、`web/manifest.json` | juku | 只影响 web 预览，不影响 ipa |
+
+**图标**只需替换 `ios/Runner/Assets.xcassets/AppIcon.appiconset/` 下的 15 个 PNG，
+尺寸必须与 `Contents.json` 声明一致（20/29/40/60/76/83.5/1024 各倍率）。
+拿一张 1024×1024 的图，用 `sips` 或任意工具批量缩放覆盖即可。
+
+两条硬要求：
+
+- 1024×1024 那张**不能带 alpha 通道**，否则 App Store Connect 直接拒收。本项目图标已处理过；
+  换图后若新图带透明，跑一次 `python tool/strip_icon_alpha.py` 即可
+- 不要自己画圆角，iOS 会自动裁
+
+**Bundle ID（`com.juku.juku`）才是不能随便改的那个**，见下节。
+
+## Bundle ID
+
+`PRODUCT_BUNDLE_IDENTIFIER = com.juku.juku`（在 `ios/Runner.xcodeproj/project.pbxproj`，共 6 处，
+其中 3 处是 RunnerTests，改主 ID 时一并改）。
+
+- 自签安装（AltStore / Sideloadly）时，bundle id 决定「装上去是覆盖升级还是并排两个 App」
+- 一旦在 App Store Connect 注册过，**永久不可改**，只能新建一条 App 记录
+- 所以正式上架前就该定好（通常是域名反写，如 `com.yourdomain.duanju`），现在改成本最低
+
 ## 待办
 
 - [ ] 局域网自动发现（Bonjour `_juku-link._tcp`）与设备配对
