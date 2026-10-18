@@ -47,12 +47,23 @@ func reportHongguoSearchProgress(ctx context.Context, entry hongguoSearchEntry) 
 	}
 }
 
+// hongguoSearchKeyword 归一化用户输入：NFKC 让全角标点、全角数字与半角
+// 等价，便于缓存和匹配。
 func hongguoSearchKeyword(keyword string) (string, error) {
-	keyword = norm.NFKC.String(strings.TrimSpace(keyword))
-	if keyword == "" || !utf8.ValidString(keyword) || utf8.RuneCountInString(keyword) > 80 || strings.IndexFunc(keyword, unicode.IsControl) >= 0 {
+	return validateSearchText(norm.NFKC.String(strings.TrimSpace(keyword)))
+}
+
+// hongguoSuggestionName 只校验、不改写联想词：联想词是直接展示给用户的文案，
+// 「永冬之下，冻土之上」被 NFKC 改成半角逗号就是可见的劣化；去重时再单独归一化。
+func hongguoSuggestionName(name string) (string, error) {
+	return validateSearchText(strings.TrimSpace(name))
+}
+
+func validateSearchText(value string) (string, error) {
+	if value == "" || !utf8.ValidString(value) || utf8.RuneCountInString(value) > 80 || strings.IndexFunc(value, unicode.IsControl) >= 0 {
 		return "", errors.New("请输入 1 至 80 个字符的搜索词")
 	}
-	return keyword, nil
+	return value, nil
 }
 
 func (downloader *Downloader) searchHongguoDramas(ctx context.Context, keyword string) (hongguoSearchEntry, error) {

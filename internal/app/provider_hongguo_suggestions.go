@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/text/unicode/norm"
 )
 
 const (
@@ -116,9 +118,13 @@ func (d *Downloader) fetchHongguoSearchSuggestions(ctx context.Context, query st
 	items := make([]hongguoSearchSuggestion, 0, hongguoSuggestionLimit)
 	seen := make(map[string]bool)
 	for _, item := range records {
-		name, err := hongguoSearchKeyword(item.Name)
-		key := strings.ToLower(name)
-		if err != nil || seen[key] {
+		name, err := hongguoSuggestionName(item.Name)
+		if err != nil {
+			continue
+		}
+		// 去重按归一化后的形式：全角 / 半角标点的同名词条只留第一条
+		key := strings.ToLower(norm.NFKC.String(name))
+		if seen[key] {
 			continue
 		}
 		seen[key] = true

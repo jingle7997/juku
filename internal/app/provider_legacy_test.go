@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -101,8 +102,13 @@ func TestLegacyAnonymousCatalogAndSessionReuse(t *testing.T) {
 		t.Fatal("automatic session changed user configuration")
 	}
 	info, err := os.Stat(filepath.Join(d.cfg.dataDirectory(), "huangguo-session.json"))
-	if err != nil || info.Mode().Perm() != 0600 {
+	if err != nil {
 		t.Fatal("anonymous session must be private", err)
+	}
+	// 服务端确实按 0600 写入，但 NTFS 不支持 Unix 权限位，Windows 上
+	// Mode().Perm() 恒为 0666，这条断言只能在 Unix 上校验。
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+		t.Fatal("anonymous session file is world-readable:", info.Mode().Perm())
 	}
 	restarted := NewDownloader(d.cfg)
 	restarted.client = &http.Client{Transport: transport}

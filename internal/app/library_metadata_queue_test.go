@@ -32,7 +32,10 @@ func TestPrimaryCatalogReturnsBeforeOptionalMetadataForAllSources(t *testing.T) 
 			id := "7615465407347952664"
 			started, release := make(chan struct{}), make(chan struct{})
 			var once sync.Once
-			var calls atomic.Int32
+			// calls 记全部请求，detailCalls 只记真正的详情请求：
+			// huangguoai 在抓详情前要先请求一次「/」发现线路（服务端会缓存 host），
+			// 这一步不算重复工作，只看详情是不是恰好抓了一次。
+			var calls, detailCalls atomic.Int32
 			d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 				calls.Add(1)
 				if request.Context().Value(backgroundCatalogKey{}) != true {
@@ -48,18 +51,23 @@ func TestPrimaryCatalogReturnsBeforeOptionalMetadataForAllSources(t *testing.T) 
 				case "/":
 					return rankingHTTPResponse(request, 200, `<a data-url="https://route.hwqlgzvsk.cc">线路</a>`), nil
 				case "/detail":
+					detailCalls.Add(1)
 					if request.URL.Query().Get("series_id") != id {
 						t.Error("historical entry was automatically fetched")
 					}
 					return rankingHTTPResponse(request, 200, sortDetailFixture(id, "1773662280")), nil
 				case "/novel/player/video_detail/v1/":
+					detailCalls.Add(1)
 					return rankingHTTPResponse(request, 200, fmt.Sprintf(`{"data":{"video_data":{"series_id_str":%q,"series_title":"详情标题","hot_score":20019,"series_play_cnt":10019}}}`, id)), nil
 				case "/api/drama/detail":
+					detailCalls.Add(1)
 					return rankingHTTPResponse(request, 200, fmt.Sprintf(`{"data":{"id":%q,"name":"详情标题","issue_date":"2026-03-16","click":10019}}`, id)), nil
 				case "/video/" + id + "/":
+					detailCalls.Add(1)
 					body := fmt.Sprintf(`<script type="application/ld+json">{"@type":"WebPage","url":"https://huangguoai.ai/detail/%s/","name":"详情标题","datePublished":"2026-03-16"}</script><div class="hg-web-detail__meta">10019次播放</div>`, id)
 					return rankingHTTPResponse(request, 200, body), nil
 				case "/detail/" + id + "/":
+					detailCalls.Add(1)
 					body := fmt.Sprintf(`<script type="application/ld+json">{"@type":"WebPage","url":"https://huangguoai.ai/detail/%s/","name":"详情标题","datePublished":"2026-03-16"}</script><div class="hg-web-detail__meta">10019次播放</div>`, id)
 					return rankingHTTPResponse(request, 200, body), nil
 				default:
@@ -119,8 +127,8 @@ func TestPrimaryCatalogReturnsBeforeOptionalMetadataForAllSources(t *testing.T) 
 					t.Errorf("asynchronous metadata was not merged correctly: %+v", row)
 				}
 			}
-			if calls.Load() != 1 {
-				t.Fatalf("duplicate detail requests: %d", calls.Load())
+			if detailCalls.Load() != 1 {
+				t.Fatalf("duplicate detail requests: %d (total requests: %d)", detailCalls.Load(), calls.Load())
 			}
 		})
 	}

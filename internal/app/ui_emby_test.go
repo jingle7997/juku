@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -60,8 +61,12 @@ func TestEmbyExportPersistentSignedLinksAndSafeArchive(t *testing.T) {
 		t.Fatal("wrong per-episode links")
 	}
 	info, err := os.Stat(filepath.Join(d.cfg.dataDirectory(), "emby-key"))
-	if err != nil || info.Size() != 32 || info.Mode().Perm() != 0o600 {
-		t.Fatal("persistent signing key not saved privately")
+	if err != nil || info.Size() != 32 {
+		t.Fatal("persistent signing key missing or wrong size", err)
+	}
+	// NTFS 没有 Unix 权限位，Windows 上恒为 0666，只在 Unix 上校验 0600。
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatal("persistent signing key is world-readable:", info.Mode().Perm())
 	}
 	restarted := &UIApp{cfg: d.cfg}
 	for _, link := range links {

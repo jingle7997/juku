@@ -135,6 +135,10 @@ class _PlayerScreenState extends State<PlayerScreen> with WidgetsBindingObserver
     if (api == null || session == null) return;
     // 快速连点选集时，只认最后一次请求的结果
     final token = ++_loadToken;
+    // 切集期间停掉进度定时器：这时 _video 还是上一集的、_episode 已经是新集，
+    // 定时器若照常触发，会把旧集的播放位置标成新集上报，服务端按
+    // run.episode != progress.episode 丢弃，白丢一次进度。
+    _progressTimer?.cancel();
     setState(() {
       _switching = true;
       _error = null;
